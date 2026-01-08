@@ -1,0 +1,23 @@
+string standalone.findAllPriceBooks()
+{
+	allBooksResponse = zoho.crm.getRecords("Price_Books", 1, 100);
+	
+	if(allBooksResponse.get("status") != "success")
+	{
+		return "Ошибка при получении прайс-листов: " + allBooksResponse.get("message");
+	}
+	
+	allBooks = allBooksResponse.get("data");
+	result = "Найдено прайс-листов: " + allBooks.size() + "\n\n";
+	
+	for each book in allBooks
+	{
+		bookName = book.get("name");
+		bookId = book.get("id");
+		result = result + "Название: " + bookName + "\n";
+		result = result + "ID: " + bookId + "\n\n";
+	}
+	
+	return result;
+}
+

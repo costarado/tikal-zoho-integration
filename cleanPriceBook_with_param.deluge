@@ -1,0 +1,89 @@
+string standalone.cleanPriceBook(string priceBookNameParam)
+{
+	if(priceBookNameParam == null || priceBookNameParam == "")
+	{
+		priceBookName = "Naymark";
+	}
+	else
+	{
+		priceBookName = priceBookNameParam;
+	}
+	
+	searchResponse = zoho.crm.searchRecords("Price_Books", "(name:equals:" + priceBookName + ")");
+	
+	if(searchResponse.get("status") != "success" || searchResponse.get("data").size() == 0)
+	{
+		return "Ошибка: Прайс-лист с именем " + priceBookName + " не найден. Проверьте название.";
+	}
+	
+	priceBookRecord = searchResponse.get("data").get(0);
+	priceBookID = priceBookRecord.get("id");
+	
+	recordResponse = zoho.crm.getRecordById("Price_Books", priceBookID.toString());
+	
+	if(recordResponse.get("status") != "success")
+	{
+		return "Ошибка: Прайс-лист с ID " + priceBookID + " не найден. Проверьте ID.";
+	}
+	
+	totalDeleted = 0;
+	page = 1;
+	perPage = 200;
+	
+	while(true)
+	{
+		response = zoho.crm.getRelatedRecords("Products", "Price_Books", priceBookID.toString(), page, perPage);
+		
+		if(response.get("status") != "success")
+		{
+			errorMsg = response.get("message");
+			
+			if(page == 1)
+			{
+				return "Ошибка при получении связанных продуктов: " + errorMsg + ". Возможно, в прайс-листе нет продуктов или ID неверный.";
+			}
+			break;
+		}
+		
+		relatedProducts = response.get("data");
+		
+		if(relatedProducts == null || relatedProducts.size() == 0)
+		{
+			if(page == 1)
+			{
+				return "В прайс-листе нет связанных продуктов для удаления.";
+			}
+			break;
+		}
+		
+		for each prod in relatedProducts
+		{
+			prodId = prod.get("id");
+			
+			if(prodId != null)
+			{
+				deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Products", prodId.toString(), {"_delete":null});
+				
+				if(deleteResponse.get("status") == "success")
+				{
+					totalDeleted = totalDeleted + 1;
+				}
+			}
+		}
+		
+		if(relatedProducts.size() < perPage)
+		{
+			break;
+		}
+		
+		page = page + 1;
+		
+		if(page > 100)
+		{
+			break;
+		}
+	}
+	
+	return "Очистка завершена. Удалено записей: " + totalDeleted;
+}
+

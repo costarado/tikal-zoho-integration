@@ -1,0 +1,38 @@
+string standalone.testPriceBookConnection()
+{
+	priceBookID = 6878864000000087665;
+	
+	result = "Тестирование подключения к прайс-листу:\n\n";
+	result = result + "ID прайс-листа: " + priceBookID + "\n\n";
+	
+	// Тест 1: Получение записи прайс-листа
+	result = result + "Тест 1: getRecordById\n";
+	recordResponse = zoho.crm.getRecordById("Price_Books", priceBookID.toString());
+	result = result + "Статус: " + recordResponse.get("status") + "\n";
+	result = result + "Код: " + recordResponse.get("code") + "\n";
+	result = result + "Сообщение: " + recordResponse.get("message") + "\n\n";
+	
+	// Тест 2: Получение связанных записей - вариант 1
+	result = result + "Тест 2: getRelatedRecords (Products, Price_Books)\n";
+	response1 = zoho.crm.getRelatedRecords("Products", "Price_Books", priceBookID.toString(), 1, 1);
+	result = result + "Статус: " + response1.get("status") + "\n";
+	result = result + "Код: " + response1.get("code") + "\n";
+	result = result + "Сообщение: " + response1.get("message") + "\n\n";
+	
+	// Тест 3: Получение связанных записей - вариант 2
+	result = result + "Тест 3: getRelatedRecords (Price_Book_Product_Details, Price_Books)\n";
+	response2 = zoho.crm.getRelatedRecords("Price_Book_Product_Details", "Price_Books", priceBookID.toString(), 1, 1);
+	result = result + "Статус: " + response2.get("status") + "\n";
+	result = result + "Код: " + response2.get("code") + "\n";
+	result = result + "Сообщение: " + response2.get("message") + "\n\n";
+	
+	// Тест 4: Получение связанных записей - вариант 3 (другой порядок)
+	result = result + "Тест 4: getRelatedRecords (Price_Books, Price_Book_Product_Details)\n";
+	response3 = zoho.crm.getRelatedRecords("Price_Books", priceBookID.toString(), "Price_Book_Product_Details", 1, 1);
+	result = result + "Статус: " + response3.get("status") + "\n";
+	result = result + "Код: " + response3.get("code") + "\n";
+	result = result + "Сообщение: " + response3.get("message") + "\n";
+	
+	return result;
+}
+

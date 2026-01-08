@@ -1,0 +1,49 @@
+// Zoho Deluge скрипт для создания звонка через Tikal API
+// Используется в Zoho Workflow или Custom Button
+
+// Параметры (получаются из контакта или формы)
+agent_id = input.Agent_ID;  // Agent ID из контакта
+phone_number = input.Phone;  // Номер телефона из контакта или формы
+
+// Если номер в поле Mobile, используйте:
+// phone_number = input.Mobile;
+
+// Очистка номера (убираем все нецифровые символы)
+phone_clean = phone_number.replaceAll("[^0-9]", "");
+
+// URL веб-сервиса (замените на ваш адрес)
+service_url = "http://your-server:5000/api/call/create";
+
+// Данные для запроса
+request_body = {
+    "agent_id": agent_id,
+    "phone_number": phone_clean,
+    "custom1": input.id,  // ID контакта в Zoho
+    "custom2": "zoho_crm"  // Метка источника
+};
+
+// Заголовки запроса
+headers = {
+    "Content-Type": "application/json"
+};
+
+// Отправка запроса
+response = invokeurl
+[
+    url: service_url
+    type: POST
+    parameters: request_body.toString()
+    connection: ""
+];
+
+// Обработка ответа
+if(response.get("success") == true) {
+    info "Звонок успешно создан!";
+    info "Агент: " + agent_id;
+    info "Номер: " + phone_clean;
+} else {
+    error_msg = response.get("error");
+    info "Ошибка создания звонка: " + error_msg;
+}
+
+return response;

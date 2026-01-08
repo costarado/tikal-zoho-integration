@@ -1,0 +1,68 @@
+string standalone.cleanPriceBook()
+{
+	priceBookID = 6878864000000087665;
+	totalDeleted = 0;
+	perPage = 200;
+	pages = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+	
+	for each page in pages
+	{
+		// Пробуем получить связанные записи через разные варианты
+		response = zoho.crm.getRelatedRecords("Price_Book_Product_Details", "Price_Books", priceBookID.toString(), page, perPage);
+		
+		// Если не работает, пробуем другой вариант
+		if(response.get("status") != "success")
+		{
+			response = zoho.crm.getRelatedRecords("Products", "Price_Books", priceBookID.toString(), page, perPage);
+		}
+		
+		if(response.get("status") != "success")
+		{
+			if(page == 1)
+			{
+				errorMsg = response.get("message");
+				return "Ошибка: " + errorMsg;
+			}
+			break;
+		}
+		
+		relatedProducts = response.get("data");
+		
+		if(relatedProducts == null || relatedProducts.size() == 0)
+		{
+			if(page == 1)
+			{
+				return "В прайс-листе нет связанных продуктов для удаления.";
+			}
+			break;
+		}
+		
+		for each prod in relatedProducts
+		{
+			prodId = prod.get("id");
+			
+			if(prodId != null)
+			{
+				// Пробуем удалить через оба варианта
+				deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Price_Book_Product_Details", prodId.toString(), {"_delete":null});
+				
+				if(deleteResponse.get("status") != "success")
+				{
+					deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Products", prodId.toString(), {"_delete":null});
+				}
+				
+				if(deleteResponse.get("status") == "success")
+				{
+					totalDeleted = totalDeleted + 1;
+				}
+			}
+		}
+		
+		if(relatedProducts.size() < perPage)
+		{
+			break;
+		}
+	}
+	
+	return "Очистка завершена. Удалено записей: " + totalDeleted;
+}

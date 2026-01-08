@@ -1,0 +1,58 @@
+string standalone.cleanPriceBook()
+{
+	priceBookID = 6878864000000087665;
+	totalDeleted = 0;
+	
+	// Альтернативный подход: получаем все записи Products и проверяем, связаны ли они с нашим прайс-листом
+	// Это может быть медленнее, но должно работать
+	page = 1;
+	perPage = 200;
+	pages = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+	
+	for each page in pages
+	{
+		// Получаем все продукты
+		productsResponse = zoho.crm.getRecords("Products", page, perPage);
+		
+		if(productsResponse.get("status") != "success")
+		{
+			if(page == 1)
+			{
+				return "Ошибка при получении продуктов: " + productsResponse.get("message");
+			}
+			break;
+		}
+		
+		allProducts = productsResponse.get("data");
+		
+		if(allProducts == null || allProducts.size() == 0)
+		{
+			break;
+		}
+		
+		for each product in allProducts
+		{
+			productId = product.get("id");
+			
+			if(productId != null)
+			{
+				// Пробуем удалить связь с прайс-листом
+				// Если продукт не связан с этим прайс-листом, операция просто не выполнится
+				deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Products", productId.toString(), {"_delete":null});
+				
+				if(deleteResponse.get("status") == "success")
+				{
+					totalDeleted = totalDeleted + 1;
+				}
+			}
+		}
+		
+		if(allProducts.size() < perPage)
+		{
+			break;
+		}
+	}
+	
+	return "Очистка завершена. Удалено записей: " + totalDeleted;
+}
+

@@ -1,0 +1,119 @@
+string standalone.cleanPriceBook()
+{
+	priceBookID = 6878864000000087665;
+	totalDeleted = 0;
+	
+	// Используем поиск записей Price_Book_Product_Details, связанных с этим прайс-листом
+	// Пробуем разные варианты поиска
+	searchCriteria1 = "(Price_Books.id:equals:" + priceBookID.toString() + ")";
+	searchCriteria2 = "(Price_Book.id:equals:" + priceBookID.toString() + ")";
+	searchCriteria3 = "(Price_Book_Name.id:equals:" + priceBookID.toString() + ")";
+	
+	// Пробуем первый вариант
+	response = zoho.crm.searchRecords("Price_Book_Product_Details", searchCriteria1);
+	
+	// Если не работает, пробуем второй вариант
+	if(response.get("status") != "success" || response.get("data").size() == 0)
+	{
+		response = zoho.crm.searchRecords("Price_Book_Product_Details", searchCriteria2);
+	}
+	
+	// Если не работает, пробуем третий вариант
+	if(response.get("status") != "success" || response.get("data").size() == 0)
+	{
+		response = zoho.crm.searchRecords("Price_Book_Product_Details", searchCriteria3);
+	}
+	
+	// Если поиск не работает, пробуем получить все записи и фильтровать
+	if(response.get("status") != "success" || response.get("data").size() == 0)
+	{
+		// Получаем все записи Price_Book_Product_Details и фильтруем вручную
+		page = 1;
+		perPage = 200;
+		pages = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+		
+		for each page in pages
+		{
+			allRecordsResponse = zoho.crm.getRecords("Price_Book_Product_Details", page, perPage);
+			
+			if(allRecordsResponse.get("status") == "success")
+			{
+				allRecords = allRecordsResponse.get("data");
+				
+				if(allRecords == null || allRecords.size() == 0)
+				{
+					break;
+				}
+				
+				for each record in allRecords
+				{
+					// Проверяем, связан ли этот продукт с нашим прайс-листом
+					priceBookField = record.get("Price_Books");
+					
+					if(priceBookField != null)
+					{
+						relatedPriceBookId = priceBookField.get("id");
+						
+						if(relatedPriceBookId != null && relatedPriceBookId.toString() == priceBookID.toString())
+						{
+							recordId = record.get("id");
+							
+							if(recordId != null)
+							{
+								// Удаляем связь
+								deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Price_Book_Product_Details", recordId.toString(), {"_delete":null});
+								
+								if(deleteResponse.get("status") == "success")
+								{
+									totalDeleted = totalDeleted + 1;
+								}
+							}
+						}
+					}
+				}
+				
+				if(allRecords.size() < perPage)
+				{
+					break;
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+	else
+	{
+		// Если поиск сработал, обрабатываем найденные записи
+		relatedProducts = response.get("data");
+		
+		for each prod in relatedProducts
+		{
+			prodId = prod.get("id");
+			
+			if(prodId != null)
+			{
+				// Пробуем удалить через оба варианта
+				deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Price_Book_Product_Details", prodId.toString(), {"_delete":null});
+				
+				if(deleteResponse.get("status") != "success")
+				{
+					deleteResponse = zoho.crm.updateRelatedRecord("Price_Books", priceBookID.toString(), "Products", prodId.toString(), {"_delete":null});
+				}
+				
+				if(deleteResponse.get("status") == "success")
+				{
+					totalDeleted = totalDeleted + 1;
+				}
+			}
+		}
+	}
+	
+	if(totalDeleted == 0 && (response.get("status") != "success" || response.get("data").size() == 0))
+	{
+		return "Не удалось найти связанные продукты. Проверьте ID прайс-листа: " + priceBookID;
+	}
+	
+	return "Очистка завершена. Удалено записей: " + totalDeleted;
+}

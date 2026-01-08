@@ -1,0 +1,37 @@
+string standalone.findPriceBookID()
+{
+	// Эта функция поможет найти ID прайс-листа по имени
+	
+	// ВАРИАНТ 1: Поиск по точному имени
+	priceBookName = "Название вашего прайс-листа"; // Замените на реальное название
+	
+	searchResponse = zoho.crm.searchRecords("Price_Books", "(name:equals:" + priceBookName + ")");
+	
+	if(searchResponse.get("status") == "success" && searchResponse.get("data").size() > 0)
+	{
+		priceBook = searchResponse.get("data").get(0);
+		bookId = priceBook.get("id");
+		bookName = priceBook.get("name");
+		return "Найден прайс-лист:\nНазвание: " + bookName + "\nID: " + bookId;
+	}
+	
+	// ВАРИАНТ 2: Поиск всех прайс-листов (первые 10)
+	allBooksResponse = zoho.crm.getRecords("Price_Books", 1, 10);
+	
+	if(allBooksResponse.get("status") == "success")
+	{
+		allBooks = allBooksResponse.get("data");
+		result = "Найдено прайс-листов: " + allBooks.size() + "\n\n";
+		
+		for each book in allBooks
+		{
+			result = result + "Название: " + book.get("name") + "\n";
+			result = result + "ID: " + book.get("id") + "\n\n";
+		}
+		
+		return result;
+	}
+	
+	return "Ошибка при поиске прайс-листов: " + allBooksResponse.get("message");
+}
+
