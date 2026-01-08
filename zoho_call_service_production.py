@@ -1,24 +1,14 @@
 """
 Веб-сервис для создания звонков из Zoho CRM через Tikal API
 Версия для Production развертывания (Railway, Render, и т.д.)
-Использует переменные окружения для конфигурации
+Standalone версия без зависимостей от tikal_client
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import sys
-import io
+import requests
 import logging
-
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-
-try:
-    from tikal_client.tikal_client_v2 import TikalClientV2
-except ImportError as e:
-    print(f"❌ Ошибка импорта: {e}")
-    sys.exit(1)
 
 app = Flask(__name__)
 CORS(app)  # Разрешаем запросы из Zoho
@@ -32,13 +22,42 @@ TIKAL_API_KEY = os.environ.get('TIKAL_API_KEY', 'c18950499e5838743873737478ff1de
 TIKAL_FORMAT = os.environ.get('TIKAL_FORMAT', 'json')
 
 
-def create_tikal_client():
-    """Создает клиент Tikal API"""
-    return TikalClientV2(
-        base_url=TIKAL_BASE_URL,
-        api_key=TIKAL_API_KEY,
-        format=TIKAL_FORMAT
-    )
+def call_tikal_api(endpoint, params):
+    """
+    Вызывает Tikal API endpoint
+    
+    Args:
+        endpoint: Путь к API endpoint (например, '/api/call/originate')
+        params: Словарь с параметрами запроса
+    
+    Returns:
+        dict: Ответ от API
+    """
+    url = f"{TIKAL_BASE_URL}{endpoint}"
+    
+    # Добавляем обязательные параметры
+    params['api_key'] = TIKAL_API_KEY
+    params['format'] = TIKAL_FORMAT
+    
+    try:
+        response = requests.post(url, data=params, timeout=30)
+        response.raise_for_status()
+        
+        if TIKAL_FORMAT == 'json':
+            return response.json()
+        else:
+            return {'data': response.text}
+    
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Tikal API error: {e}")
+        return {
+            'data': {
+                'status': {
+                    'code': '500',
+                    'message': str(e)
+                }
+            }
+        }
 
 
 @app.route('/health', methods=['GET'])
@@ -97,27 +116,35 @@ def create_call():
                 'error': 'phone_number is required'
             }), 400
         
+        # Очистка номера телефона (только цифры)
+        phone_number = ''.join(filter(str.isdigit, str(phone_number)))
+        
         # Дополнительные параметры
         custom1 = data.get('custom1', '')
         custom2 = data.get('custom2', '')
         zoho_contact_id = data.get('zoho_contact_id', '')
         
-        # Создаем клиент и звонок
-        client = create_tikal_client()
+        # Подготовка параметров для Tikal API
+        tikal_params = {
+            'ag_exten': str(agent_id),  # Agent extension (login)
+            'dest_num': phone_number,   # Destination number (only digits)
+        }
+        
+        # Добавляем custom поля, если есть
+        if custom1 or zoho_contact_id:
+            tikal_params['custom1'] = custom1 or zoho_contact_id
+        if custom2:
+            tikal_params['custom2'] = custom2
         
         logger.info(f"Creating call: agent_id={agent_id}, phone={phone_number}")
         
-        result = client.calls.originate(
-            agent_id=agent_id,
-            dest_num=phone_number,
-            custom1=custom1 or zoho_contact_id,
-            custom2=custom2
-        )
-        
-        client.close()
+        # Вызов Tikal API
+        result = call_tikal_api('/api/call/originate', tikal_params)
         
         # Проверяем результат
-        if result.get('data', {}).get('status', {}).get('code') == '200':
+        status_code = result.get('data', {}).get('status', {}).get('code', '')
+        
+        if status_code == '200':
             return jsonify({
                 'success': True,
                 'message': 'Call created successfully',
@@ -145,9 +172,9 @@ def create_call():
 def call_status():
     """Проверка статуса сервиса"""
     try:
-        client = create_tikal_client()
-        # Простая проверка подключения
-        client.close()
+        # Простая проверка подключения к Tikal API
+        test_params = {'format': TIKAL_FORMAT}
+        result = call_tikal_api('/api/call/get_incoming', test_params)
         
         return jsonify({
             'status': 'ok',
