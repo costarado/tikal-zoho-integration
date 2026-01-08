@@ -2,10 +2,7 @@
 nixPkgs = ["python311"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
-
-[phases.build]
-cmds = []
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
 
 [start]
 cmd = "python zoho_call_service_production.py"
